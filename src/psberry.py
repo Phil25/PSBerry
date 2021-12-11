@@ -1,7 +1,7 @@
 import argparse
 import pathlib
 from operations import ChangeSlot, CreateSlot, DeleteSlot, EditSlot
-from typing import Dict
+from typing import Dict, Tuple
 from enum import IntFlag
 from system import System, SystemMock
 from remi import gui, start, App
@@ -276,6 +276,60 @@ class SlotButtons(gui.HBox):
         self._create.set_enabled(not creating)
         self._clone.set_enabled(not creating)
 
+class StaticTabBox(gui.VBox):
+    _containers: Dict[str, gui.Container]
+    _active_button: gui.Button
+
+    _ITEM_STYLE = {
+        "border-style": "none",
+        "border-color": "black",
+        "color": "black",
+        "background-color": "#cceef7",
+        "margin": "5px",
+        "box-shadow": "none",
+    }
+
+    def __init__(self, containers: Dict[str, gui.Container], *args, **kwargs):
+        super().__init__(width="100%", *args, **kwargs)
+        assert containers, "No tabs specified"
+
+        self._containers = containers
+        self._active_button = None
+
+        tabs = gui.HBox(width="100%")
+        self.append(tabs)
+
+        width = 100.0 / len(containers)
+        for name, container in containers.items():
+            button = gui.Button(name, style=self._ITEM_STYLE)
+            button.set_size(f"{width:.1f}%", "30px")
+            button.onclick.do(self._on_tab_change)
+            tabs.append(button, name)
+            self.append(container)
+
+        self._on_tab_change(tabs.get_child(list(containers)[0]))
+
+    def _on_tab_change(self, button: gui.Button):
+        for container in self._containers.values():
+            container.css_display = "none"
+
+        assert button.get_text() in self._containers
+        del self._containers[button.get_text()].css_display
+
+        if self._active_button is not None:
+            self._disable_button(self._active_button)
+
+        self._active_button = button
+        self._enable_button(self._active_button)
+
+    def _enable_button(self, button: gui.Button):
+        button.style["background-color"] = "#66cee9"
+        button.style["border-style"] = "none none solid none"
+
+    def _disable_button(self, button: gui.Button):
+        button.style["background-color"] = "#cceef7"
+        button.style["border-style"] = "none"
+
 class PSBerry(App):
     _state: State
     _slot_list: SlotList
@@ -291,16 +345,12 @@ class PSBerry(App):
         container = gui.VBox(width="100%", style=self._CONTAINER_STYLE)
 
         mode_panel = ModePanel()
-        container.append(mode_panel)
-
         fs_active_panel = FilesystemActivePanel()
+        tab_box = StaticTabBox(dict([self._save_manager(), self._content_uploader()]))
+
+        container.append(mode_panel)
         container.append(fs_active_panel)
-
-        self._slot_list = SlotList(self._on_slot_edit, self._on_slot_select)
-        container.append(self._slot_list)
-
-        self._slot_buttons = SlotButtons(self._on_slot_create)
-        container.append(self._slot_buttons)
+        container.append(tab_box)
 
         self._register("mode", mode_panel.set_mode)
         self._register("fs_active", fs_active_panel.set_fs_active)
@@ -309,6 +359,23 @@ class PSBerry(App):
         self._register("operations", self._slot_buttons.on_operations_update)
 
         return container
+
+    def _save_manager(self) -> Tuple[str, gui.Container]:
+        save_manager = gui.VBox(width="100%")
+
+        self._slot_list = SlotList(self._on_slot_edit, self._on_slot_select)
+        save_manager.append(self._slot_list)
+
+        self._slot_buttons = SlotButtons(self._on_slot_create)
+        save_manager.append(self._slot_buttons)
+
+        return "Save Manager", save_manager
+
+    def _content_uploader(self) -> Tuple[str, gui.Container]:
+        content_uploader = gui.VBox(width="100%")
+        content_uploader.append(gui.Button("Configure", width="60%", height=30, margin="10px"))
+
+        return "Content Uploader", content_uploader
 
     def _register(self, field: str, callback):
         "Register for state change, but also trigger if already set"
