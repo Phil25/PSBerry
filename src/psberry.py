@@ -62,6 +62,7 @@ class SlotItem(gui.HBox):
     _slot_id: str
     _name: gui.Label
     _desc: gui.Label
+    _menu: gui.Button
 
     _STYLE = {
         "border-style": "none none none solid",
@@ -77,9 +78,9 @@ class SlotItem(gui.HBox):
         self._desc = gui.Label("", width="100%", style={"text-align": "left", "font-style": "italic", "opacity": "0.5"})
         self._update_color()
 
-        menu = gui.Button(text="☰", width="15%", style={"margin": "10px", "background": "none", "border-style": "ridge", "font-size": "26px"})
-        menu.onclick.do(lambda c : on_context(slot_id))
-        self.append(menu)
+        self._menu = gui.Button(text="☰", width="15%", style={"margin": "10px", "background": "none", "border-style": "ridge", "font-size": "26px"})
+        self._menu.onclick.do(lambda c : on_context(slot_id))
+        self.append(self._menu)
 
         info = gui.VBox(width="85%", height="80%", style={"background": "none"})
         info.append(self._name)
@@ -129,6 +130,12 @@ class SlotItem(gui.HBox):
         self._flags &= ~self.Flags.DELETE
         self._update_color()
 
+    def enable_editing(self):
+        self._menu.set_enabled(True)
+
+    def disable_editing(self):
+        self._menu.set_enabled(False)
+
     def set_name(self, name: str):
         name = f": {name}" if name else ""
         self._name.set_text(f"{self._slot_id}{name}")
@@ -170,46 +177,32 @@ class SlotList(gui.VBox):
             self._list[slot_id] = item
             self.append(item)
 
-    def _deactivate_all(self):
+    def _all(self, func: str):
         for item in self._list.values():
-            item.deactivate()
+            getattr(item, func)()
 
-    def _deselect_all(self):
-        for item in self._list.values():
-            item.deselect()
-
-    def _unmark_all(self):
-        for item in self._list.values():
-            item.unmark_for_deletion()
-
-    def _activate_slot_id(self, slot_id: str):
+    def _single(self, slot_id: str, func: str):
         if slot_id in self._list:
-            self._list[slot_id].activate()
-
-    def _select_slot_id(self, slot_id: str):
-        if slot_id in self._list:
-            self._list[slot_id].select()
-
-    def _mark_slot_id_for_deletion(self, slot_id: str):
-        if slot_id in self._list:
-            self._list[slot_id].mark_for_deletion()
+            getattr(self._list[slot_id], func)()
 
     def set_active(self, slot_id: str):
-        self._deactivate_all()
-        self._activate_slot_id(slot_id)
+        self._all("deactivate")
+        self._single(slot_id, "activate")
 
     def on_operations_update(self, ops):
         if ops is None:
             return
 
-        self._deselect_all()
-        self._unmark_all()
+        self._all("deselect")
+        self._all("unmark_for_deletion")
+        self._all("enable_editing")
 
         if ChangeSlot.__name__ in ops:
-            self._select_slot_id(ops[ChangeSlot.__name__].slot_id)
+            self._single(ops[ChangeSlot.__name__].slot_id, "select")
 
         if DeleteSlot.__name__ in ops:
-            self._mark_slot_id_for_deletion(ops[DeleteSlot.__name__].slot_id)
+            self._single(ops[DeleteSlot.__name__].slot_id, "mark_for_deletion")
+            self._all("disable_editing") # slot_ids might change and desync
 
 class SlotEditDialog(gui.GenericDialog):
     _slot_id: str
