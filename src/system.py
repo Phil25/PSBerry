@@ -28,13 +28,7 @@ class SystemBase():
         self._watchdog.join()
         return True
 
-    def _update_filesystem(self, remount=True) -> bool:
-        # remount the fs to have it update
-        if remount:
-            self._umount()._mount(readonly=True)
-
-        fs = {"slots": {}}
-
+    def _update_saves(self, fs):
         loc = os.path.join(self._mount_point, "PS4")
         save_dirs = get_save_dirs(loc)
         fs["active_slot"] = get_active_slot(save_dirs)
@@ -44,6 +38,40 @@ class SystemBase():
             slot_id = fs["active_slot"] if len(parts) < 2 else parts[1]
             name, description = get_save_info(loc, save_dir)
             fs["slots"][slot_id] = {"name": name.strip(), "description": description.strip()}
+
+    def _update_media(self, fs):
+        current = self._state.read("filesystem")
+
+        def browse(directory):
+            if not os.path.isdir(directory):
+                return
+            for game in os.listdir(directory):
+                game_dir = os.path.join(directory, game)
+                for media in os.listdir(game_dir):
+                    data = os.stat(os.path.join(game_dir, media))
+                    current_data = current["media"].get(media)
+                    is_active = False
+
+                    if current_data is not None:
+                        is_active = current_data["last_access"] != data.st_atime_ns
+
+                    fs["media"][media] = {
+                        "last_access": data.st_atime_ns,
+                        "is_active": is_active,
+                        "size": data.st_size,
+                        "game": game,
+                    }
+
+        browse(os.path.join(self._mount_point, "PS5", "CREATE", "Video Clips"))
+
+    def _update_filesystem(self, remount=True) -> bool:
+        # remount the fs to have it update
+        if remount:
+            self._umount()._mount(readonly=True)
+
+        fs = {"slots": {}, "media": {}}
+        self._update_saves(fs)
+        self._update_media(fs)
 
         # return if the write happened, i.e. filesystem changed
         return self._state.write("filesystem", fs)

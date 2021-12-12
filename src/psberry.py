@@ -339,7 +339,7 @@ class PSBerry(App):
 
         mode_panel = ModePanel()
         fs_active_panel = FilesystemActivePanel()
-        tab_box = StaticTabBox(dict([self._save_manager(), self._content_uploader()]))
+        tab_box = StaticTabBox(dict([self._save_manager(), self._media_uploader()]))
 
         container.append(mode_panel)
         container.append(fs_active_panel)
@@ -364,11 +364,11 @@ class PSBerry(App):
 
         return "Save Manager", save_manager
 
-    def _content_uploader(self) -> Tuple[str, gui.Container]:
-        content_uploader = gui.VBox(width="100%")
-        content_uploader.append(gui.Button("Configure", width="60%", height=30, margin="10px"))
+    def _media_uploader(self) -> Tuple[str, gui.Container]:
+        media_uploader = gui.VBox(width="100%")
+        media_uploader.append(gui.Button("Configure Endpoints", width="60%", height=30, margin="5px 20%"))
 
-        return "Content Uploader", content_uploader
+        return "Media Uploader", media_uploader
 
     def _register(self, field: str, callback):
         "Register for state change, but also trigger if already set"
