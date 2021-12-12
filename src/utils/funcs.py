@@ -14,8 +14,8 @@ def get_active_slot(saves):
             return slot
     return None
 
-def get_save_info(loc, save_dir):
-    meta = os.path.join(loc, save_dir, "meta.txt")
+def get_save_info(save_dir):
+    meta = os.path.join(save_dir, "meta.txt")
     if not os.path.exists(meta):
         return "", ""
     

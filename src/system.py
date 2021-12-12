@@ -36,8 +36,16 @@ class SystemBase():
         for save_dir in save_dirs:
             parts = save_dir.split(".")
             slot_id = fs["active_slot"] if len(parts) < 2 else parts[1]
-            name, description = get_save_info(loc, save_dir)
-            fs["slots"][slot_id] = {"name": name.strip(), "description": description.strip()}
+            save_dir = os.path.join(loc, save_dir)
+
+            name, description = get_save_info(save_dir)
+            last_access = os.stat(save_dir).st_atime_ns
+
+            fs["slots"][slot_id] = {
+                "name": name.strip(),
+                "description": description.strip(),
+                "last_access": last_access
+            }
 
     def _update_media(self, fs):
         current = self._state.read("filesystem")
