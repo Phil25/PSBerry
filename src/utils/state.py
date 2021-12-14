@@ -1,4 +1,5 @@
-import threading
+from threading import Lock
+from copy import deepcopy
 from typing import Dict
 
 """
@@ -19,7 +20,7 @@ class OperationBase():
 
 class State():
     def __init__(self) -> None:
-        self._lock = threading.Lock()
+        self._lock = Lock()
         self._data = {"operations": {}, "filesystem": {"slots": {}, "active_slot": "", "media": {}}}
         self._listeners = {}
 
@@ -37,8 +38,9 @@ class State():
                 return False
 
             self._data[field] = value
-            self._call_listeners(field, value)
-            return True
+
+        self._call_listeners(field, value)
+        return True
 
     def register(self, field: str, callback):
         with self._lock:
@@ -51,7 +53,9 @@ class State():
             assert "operations" in self._data
 
             self._data["operations"][type(op).__name__] = op
-            self._call_listeners("operations", self._data["operations"])
+            data = deepcopy(self._data["operations"])
+
+        self._call_listeners("operations", data)
 
     def pop_operations(self) -> Dict[str, OperationBase]:
         with self._lock:
@@ -59,6 +63,6 @@ class State():
 
             ops = self._data.pop("operations")
             self._data["operations"] = {} # add it right back
-            self._call_listeners("operations", {})
 
-            return ops
+        self._call_listeners("operations", {})
+        return ops
