@@ -21,7 +21,7 @@ class OperationBase():
 class State():
     def __init__(self) -> None:
         self._lock = Lock()
-        self._data = {"operations": {}, "filesystem": {"slots": {}, "active_slot": "", "media": {}}}
+        self._data = {"operations": {}, "filesystem": {"slots": {}, "active_slot": "", "media": {}}, "drivers": []}
         self._listeners = {}
 
     def _call_listeners(self, field: str, value):

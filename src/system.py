@@ -56,7 +56,8 @@ class SystemBase():
             for game in os.listdir(directory):
                 game_dir = os.path.join(directory, game)
                 for media in os.listdir(game_dir):
-                    data = os.stat(os.path.join(game_dir, media))
+                    file_path = os.path.join(game_dir, media)
+                    data = os.stat(file_path)
                     current_data = current["media"].get(media)
                     is_active = False
 
@@ -68,6 +69,7 @@ class SystemBase():
                         "is_active": is_active,
                         "size": data.st_size,
                         "game": game,
+                        "path": file_path,
                     }
 
         browse(os.path.join(self._mount_point, "PS5", "CREATE", "Video Clips"))

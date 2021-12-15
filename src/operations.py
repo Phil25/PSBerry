@@ -1,5 +1,7 @@
 import os
 import shutil
+from typing import List
+from drivers import DriverBase
 from utils.state import OperationBase
 from utils.funcs import get_active_slot, get_save_dirs
 
@@ -118,7 +120,7 @@ class DeleteSlot(OperationBase):
 class CreateSlot(OperationBase):
     _clone_active: bool
 
-    def __init__(self, clone_active: bool)  -> None:
+    def __init__(self, clone_active: bool) -> None:
         super().__init__()
         self._clone_active = clone_active
 
@@ -144,3 +146,35 @@ class CreateSlot(OperationBase):
                 shutil.copytree(active, savedata)
         else:
             os.mkdir(savedata)
+
+class TransferFiles(OperationBase):
+    _drivers: List[DriverBase]
+
+    def __init__(self, media, drivers: List[DriverBase]) -> None:
+        super().__init__()
+        assert len(media), "Media count cannot be zero"
+        assert len(drivers), "Driver count cannot be zero"
+        self._media = media
+        self._drivers = drivers
+
+    @property
+    def overview(self) -> str:
+        count = len(self._media)
+        detail = f"{count} files" if count > 1 else f"file \"{list(self._media)[0]}\""
+        return f"Transferring {detail} to the specified remotes."
+
+    def run(self, mount_point: str):
+        # TODO: update the UI instead
+        def progress(filename: str, cur: int, size: int):
+            print(filename, ":", cur, "/", size, flush=True)
+
+        # TODO: parallelize by driver
+        for name, data in self._media.items():
+            path = data["path"]
+            success = True
+
+            for driver in self._drivers:
+                success = success and driver.upload(path, name, progress)
+
+            if success:
+                os.remove(path)

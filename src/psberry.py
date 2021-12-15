@@ -1,6 +1,7 @@
 import argparse
 import pathlib
-from operations import ChangeSlot, CreateSlot, DeleteSlot, EditSlot
+from drivers import DriverSMB
+from operations import ChangeSlot, CreateSlot, DeleteSlot, EditSlot, TransferFiles
 from typing import Dict, Tuple
 from enum import IntFlag
 from system import System, SystemMock
@@ -366,7 +367,7 @@ class PSBerry(App):
 
     def _media_uploader(self) -> Tuple[str, gui.Container]:
         media_uploader = gui.VBox(width="100%")
-        media_uploader.append(gui.Button("Configure Endpoints", width="60%", height=30, margin="5px 20%"))
+        media_uploader.append(gui.Button("Configure Remotes", width="60%", height=30, margin="5px 20%"))
 
         return "Media Uploader", media_uploader
 
@@ -381,6 +382,12 @@ class PSBerry(App):
 
         self._slot_list.update_items(fs["slots"])
         self._slot_list.set_active(fs["active_slot"])
+
+        # TODO: move elsewhere
+        if len(fs["media"]):
+            drivers = self._state.read("drivers")
+            if len(drivers):
+                self._state.queue_operation(TransferFiles(fs["media"], drivers))
 
     def _on_slot_edit(self, slot_id: str):
         fs = self._state.read("filesystem")
@@ -411,6 +418,11 @@ def get_args():
 def main():
     args = get_args()
     state = State()
+
+    state.write("drivers", [
+        # TODO: move this to UI configuration
+        DriverSMB("remote", "folder", "username", "password")
+    ])
 
     with (SystemMock if args.mock else System)(state, args.block, args.mount):
         start(PSBerry, address="0.0.0.0", port=8080, start_browser=args.browser, debug=args.debug, userdata=(state,))
