@@ -1,5 +1,6 @@
 import os
 import shutil
+from copy import deepcopy
 from typing import List
 from drivers import DriverBase
 from utils.state import OperationBase
@@ -150,12 +151,13 @@ class CreateSlot(OperationBase):
 class TransferFiles(OperationBase):
     _drivers: List[DriverBase]
 
-    def __init__(self, media, drivers: List[DriverBase]) -> None:
+    def __init__(self, media, drivers: List[DriverBase], progress) -> None:
         super().__init__()
         assert len(media), "Media count cannot be zero"
         assert len(drivers), "Driver count cannot be zero"
         self._media = media
         self._drivers = drivers
+        self._progress = progress
 
     @property
     def overview(self) -> str:
@@ -164,17 +166,23 @@ class TransferFiles(OperationBase):
         return f"Transferring {detail} to the specified remotes."
 
     def run(self, mount_point: str):
-        # TODO: update the UI instead
-        def progress(filename: str, cur: int, size: int):
-            print(filename, ":", cur, "/", size, flush=True)
-
         # TODO: parallelize by driver
         for name, data in self._media.items():
             path = data["path"]
             success = True
 
             for driver in self._drivers:
-                success = success and driver.upload(path, name, progress)
+                success = success and driver.upload(path, name, self._progress)
 
             if success:
                 os.remove(path)
+
+    # prevent deepcopy of self._progress property, because it contains
+    # an instance of remi GUI objects which are not deepcopyable
+    def __deepcopy__(self, memo):
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        for k, v in self.__dict__.items():
+            setattr(result, k, v if k == "_progress" else deepcopy(v, memo))
+        return result

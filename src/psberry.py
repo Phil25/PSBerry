@@ -324,10 +324,69 @@ class StaticTabBox(gui.VBox):
         button.style["background-color"] = "#cceef7"
         button.style["border-style"] = "none"
 
+class MediaItem(gui.VBox):
+    _name: str
+    _bar: gui.Progress
+
+    def __init__(self, name: str, data, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._name = name
+        self._data = data
+        self._bar = gui.Progress()
+
+        self.append(gui.Label(name, width="100%", style={"text-align": "left", "font-weight": "bold"}))
+        self.append(self._bar)
+
+    def progress(self, cur: int, size: int):
+        percentage = int(cur / size * 100)
+        self._bar.set_value(percentage)
+
+# TODO: commonize with SlotList
+class MediaList(gui.VBox):
+    # TODO: this could be a list, maybe keeping it as Dict will help with commonizing
+    _list: Dict[str, MediaItem]
+    _active: str
+    _selected: str
+
+    def __init__(self, on_media_upload, *args, **kwargs):
+        super().__init__(width="100%", *args, **kwargs)
+        self._list = {}
+        self._on_media_upload = on_media_upload
+
+    def update_items(self, media_data):
+        if len(self.children) == len(media_data):
+            return
+
+        self._rebuild(media_data)
+
+        if len(media_data):
+            self._on_media_upload(media_data, self._progress)
+
+    def _rebuild(self, media_data):
+        self.empty()
+        self._list.clear()
+
+        for name, data in media_data.items():
+            item = MediaItem(name, data)
+            self._list[name] = item
+            self.append(item)
+
+    def _all(self, func: str, *args, **kwargs):
+        for item in self._list.values():
+            getattr(item, func)(*args, **kwargs)
+
+    def _single(self, key: str, func: str, *args, **kwargs):
+        if key in self._list:
+            getattr(self._list[key], func)(*args, **kwargs)
+
+    def _progress(self, filename: str, cur: int, size: int):
+        self._single(filename, "progress", cur, size)
+
 class PSBerry(App):
     _state: State
     _slot_list: SlotList
     _slot_buttons: SlotButtons
+    _media_list: MediaList
 
     _CONTAINER_STYLE = {"margin": "0px auto", "max-width": "400px"}
 
@@ -367,6 +426,10 @@ class PSBerry(App):
 
     def _media_uploader(self) -> Tuple[str, gui.Container]:
         media_uploader = gui.VBox(width="100%")
+
+        self._media_list = MediaList(self._on_media_upload)
+        media_uploader.append(self._media_list)
+
         media_uploader.append(gui.Button("Configure Remotes", width="60%", height=30, margin="5px 20%"))
 
         return "Media Uploader", media_uploader
@@ -382,12 +445,7 @@ class PSBerry(App):
 
         self._slot_list.update_items(fs["slots"])
         self._slot_list.set_active(fs["active_slot"])
-
-        # TODO: move elsewhere
-        if len(fs["media"]):
-            drivers = self._state.read("drivers")
-            if len(drivers):
-                self._state.queue_operation(TransferFiles(fs["media"], drivers))
+        self._media_list.update_items(fs["media"])
 
     def _on_slot_edit(self, slot_id: str):
         fs = self._state.read("filesystem")
@@ -405,6 +463,11 @@ class PSBerry(App):
 
     def _on_slot_create(self, clone_active: bool):
         self._state.queue_operation(CreateSlot(clone_active=clone_active))
+
+    def _on_media_upload(self, media_data, progress):
+        drivers = self._state.read("drivers")
+        if len(drivers):
+            self._state.queue_operation(TransferFiles(media_data, drivers, progress))
 
 def get_args():
     parser = argparse.ArgumentParser(description="Start PSBerry.")
