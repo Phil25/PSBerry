@@ -1,19 +1,19 @@
 import argparse
 import pathlib
+import remi
 from drivers import DriverSMB
 from operations import ChangeSlot, CreateSlot, DeleteSlot, EditSlot, TransferFiles
 from typing import Dict, Tuple
 from enum import IntFlag
 from collections import namedtuple
 from system import System, SystemMock
-from remi import gui, start, App
 from utils.mode import Mode
 from utils.state import State
 from utils.funcs import format_bytes
 
-class ModePanel(gui.HBox):
-    _icon: gui.Image
-    _text: gui.Label
+class ModePanel(remi.gui.HBox):
+    _icon: remi.gui.Image
+    _text: remi.gui.Label
 
     _MODES = {
         Mode.USB: (
@@ -28,8 +28,8 @@ class ModePanel(gui.HBox):
 
     def __init__(self, *args, **kwargs):
         super().__init__(width="100%", *args, **kwargs)
-        self._icon = gui.Image("", width=100, height=100)
-        self._text = gui.Label("", margin="10px")
+        self._icon = remi.gui.Image("", width=100, height=100)
+        self._text = remi.gui.Label("", margin="10px")
         self.append(self._icon)
         self.append(self._text)
 
@@ -39,14 +39,14 @@ class ModePanel(gui.HBox):
             self._icon.set_image(icon)
             self._text.set_text(text)
 
-class FilesystemActivePanel(gui.HBox):
-    _icon: gui.Label
-    _text: gui.Label
+class FilesystemActivePanel(remi.gui.HBox):
+    _icon: remi.gui.Label
+    _text: remi.gui.Label
 
     def __init__(self, *args, **kwargs):
         super().__init__(width="50%", *args, **kwargs)
-        self._icon = gui.Label("●", margin="10px", style={"font-size": "20px"})
-        self._text = gui.Label("filesystem active", margin="10px")
+        self._icon = remi.gui.Label("●", margin="10px", style={"font-size": "20px"})
+        self._text = remi.gui.Label("filesystem active", margin="10px")
         self.append(self._icon)
         self.append(self._text)
 
@@ -55,7 +55,7 @@ class FilesystemActivePanel(gui.HBox):
             self._icon.set_text("●" if active else "○")
             self._text.set_text("filesystem active" if active else "filesystem idle")
 
-class SlotItem(gui.HBox):
+class SlotItem(remi.gui.HBox):
     class Flags(IntFlag):
         SELECTED = 1
         ACTIVE = 2
@@ -63,9 +63,9 @@ class SlotItem(gui.HBox):
 
     _flags: Flags
     _slot_id: str
-    _name: gui.Label
-    _desc: gui.Label
-    _menu: gui.Button
+    _name: remi.gui.Label
+    _desc: remi.gui.Label
+    _menu: remi.gui.Button
 
     _STYLE = {
         "border-style": "none none none solid",
@@ -77,15 +77,15 @@ class SlotItem(gui.HBox):
         super().__init__(width="95%", height=70, style=self._STYLE, *args, **kwargs)
         self._flags = self.Flags(0)
         self._slot_id = slot_id
-        self._name = gui.Label(slot_id, width="100%", style={"text-align": "left", "font-weight": "bold"})
-        self._desc = gui.Label("", width="100%", style={"text-align": "left", "font-style": "italic", "opacity": "0.5"})
+        self._name = remi.gui.Label(slot_id, width="100%", style={"text-align": "left", "font-weight": "bold"})
+        self._desc = remi.gui.Label("", width="100%", style={"text-align": "left", "font-style": "italic", "opacity": "0.5"})
         self._update_color()
 
-        self._menu = gui.Button(text="☰", width="15%", style={"margin": "10px", "background": "none", "border-style": "ridge", "font-size": "26px"})
+        self._menu = remi.gui.Button(text="☰", width="15%", style={"margin": "10px", "background": "none", "border-style": "ridge", "font-size": "26px"})
         self._menu.onclick.do(lambda c : on_context(slot_id))
         self.append(self._menu)
 
-        info = gui.VBox(width="85%", height="80%", style={"background": "none"})
+        info = remi.gui.VBox(width="85%", height="80%", style={"background": "none"})
         info.append(self._name)
         info.append(self._desc)
         info.onclick.do(lambda c : on_click(slot_id))
@@ -146,7 +146,7 @@ class SlotItem(gui.HBox):
     def set_description(self, desc: str):
         self._desc.set_text(desc)
 
-class SlotList(gui.VBox):
+class SlotList(remi.gui.VBox):
     _list: Dict[str, SlotItem]
     _active: str
     _selected: str
@@ -207,7 +207,7 @@ class SlotList(gui.VBox):
             self._single(ops[DeleteSlot.__name__].slot_id, "mark_for_deletion")
             self._all("disable_editing") # slot_ids might change and desync
 
-class SlotEditDialog(gui.GenericDialog):
+class SlotEditDialog(remi.gui.GenericDialog):
     _slot_id: str
 
     _NAME = "key_name"
@@ -219,15 +219,15 @@ class SlotEditDialog(gui.GenericDialog):
         self.conf.set_text("Apply")
         self._slot_id = slot_id
 
-        name = gui.TextInput(hint=f"Name of {slot_id}...")
+        name = remi.gui.TextInput(hint=f"Name of {slot_id}...")
         name.set_text(data["name"])
 
-        description = gui.TextInput(single_line=False, hint=f"Description of {slot_id}...")
+        description = remi.gui.TextInput(single_line=False, hint=f"Description of {slot_id}...")
         description.set_text(data["description"])
 
         self.add_field_with_label(self._NAME, "Name", name)
         self.add_field_with_label(self._DESC, "Description", description)
-        self.add_field_with_label(self._DEL, "Slide to delete", gui.Slider(default_value=0, min=0, max=100))
+        self.add_field_with_label(self._DEL, "Slide to delete", remi.gui.Slider(default_value=0, min=0, max=100))
     
     @property
     def slot_id(self) -> str:
@@ -242,9 +242,9 @@ class SlotEditDialog(gui.GenericDialog):
     def is_maked_for_deletion(self) -> bool:
         return self.get_field(self._DEL).get_value() == "100"
 
-class SlotButtons(gui.HBox):
-    _create: gui.Button
-    _clone: gui.Button
+class SlotButtons(remi.gui.HBox):
+    _create: remi.gui.Button
+    _clone: remi.gui.Button
 
     _LABEL_CREATE = "Create New"
     _LABEL_CLONE = "Clone Active"
@@ -253,15 +253,15 @@ class SlotButtons(gui.HBox):
         super().__init__(width="100%", height=40, *args, **kwargs)
         self._create_op = create_op
 
-        self._create = gui.Button(self._LABEL_CREATE, width="50%", height="75%", margin="20px")
+        self._create = remi.gui.Button(self._LABEL_CREATE, width="50%", height="75%", margin="20px")
         self._create.onclick.do(self._on_slot_create)
         self.append(self._create)
 
-        self._clone = gui.Button(self._LABEL_CLONE, width="50%", height="75%", margin="20px")
+        self._clone = remi.gui.Button(self._LABEL_CLONE, width="50%", height="75%", margin="20px")
         self._clone.onclick.do(self._on_slot_create)
         self.append(self._clone)
 
-    def _on_slot_create(self, button: gui.Button):
+    def _on_slot_create(self, button: remi.gui.Button):
         self._create_op(button.get_text() ==self._LABEL_CLONE)
 
     def on_operations_update(self, ops):
@@ -272,9 +272,9 @@ class SlotButtons(gui.HBox):
         self._create.set_enabled(not creating)
         self._clone.set_enabled(not creating)
 
-class StaticTabBox(gui.VBox):
-    _containers: Dict[str, gui.Container]
-    _active_button: gui.Button
+class StaticTabBox(remi.gui.VBox):
+    _containers: Dict[str, remi.gui.Container]
+    _active_button: remi.gui.Button
 
     _ITEM_STYLE = {
         "border-style": "none",
@@ -285,19 +285,19 @@ class StaticTabBox(gui.VBox):
         "box-shadow": "none",
     }
 
-    def __init__(self, containers: Dict[str, gui.Container], *args, **kwargs):
+    def __init__(self, containers: Dict[str, remi.gui.Container], *args, **kwargs):
         super().__init__(width="100%", *args, **kwargs)
         assert containers, "No tabs specified"
 
         self._containers = containers
         self._active_button = None
 
-        tabs = gui.HBox(width="100%")
+        tabs = remi.gui.HBox(width="100%")
         self.append(tabs)
 
         width = 100.0 / len(containers)
         for name, container in containers.items():
-            button = gui.Button(name, style=self._ITEM_STYLE)
+            button = remi.gui.Button(name, style=self._ITEM_STYLE)
             button.set_size(f"{width:.1f}%", "30px")
             button.onclick.do(self._on_tab_change)
             tabs.append(button, name)
@@ -305,7 +305,7 @@ class StaticTabBox(gui.VBox):
 
         self._on_tab_change(tabs.get_child(list(containers)[0]))
 
-    def _on_tab_change(self, button: gui.Button):
+    def _on_tab_change(self, button: remi.gui.Button):
         for container in self._containers.values():
             container.css_display = "none"
 
@@ -318,25 +318,25 @@ class StaticTabBox(gui.VBox):
         self._active_button = button
         self._enable_button(self._active_button)
 
-    def _enable_button(self, button: gui.Button):
+    def _enable_button(self, button: remi.gui.Button):
         button.style["background-color"] = "#66cee9"
         button.style["border-style"] = "none none solid none"
 
-    def _disable_button(self, button: gui.Button):
+    def _disable_button(self, button: remi.gui.Button):
         button.style["background-color"] = "#cceef7"
         button.style["border-style"] = "none"
 
-class MediaItem(gui.VBox):
+class MediaItem(remi.gui.VBox):
     Size = namedtuple("Size", ["number", "string"])
 
     _size: Size
     _filename: str
     _active_cycle: int
     _last_percentage: int
-    _name: gui.Label
-    _action: gui.Label
-    _progress: gui.Label
-    _bar: gui.Progress
+    _name: remi.gui.Label
+    _action: remi.gui.Label
+    _progress: remi.gui.Label
+    _bar: remi.gui.Progress
 
     _STYLE = {
         "border-style": "none none none solid",
@@ -352,10 +352,10 @@ class MediaItem(gui.VBox):
         self._active_cycle = 0
         self._last_percentage = 0
 
-        self._name = gui.Label(filename, width="100%", style={"text-align": "left", "font-weight": "bold"})
-        self._action = gui.Label("", width="100%", style={"text-align": "left", "opacity": "0.5"})
-        self._progress = gui.Label("", width="100%", style={"text-align": "left", "opacity": "0.5"})
-        self._bar = gui.Progress(width="100%")
+        self._name = remi.gui.Label(filename, width="100%", style={"text-align": "left", "font-weight": "bold"})
+        self._action = remi.gui.Label("", width="100%", style={"text-align": "left", "opacity": "0.5"})
+        self._progress = remi.gui.Label("", width="100%", style={"text-align": "left", "opacity": "0.5"})
+        self._bar = remi.gui.Progress(width="100%")
 
         self.append(self._name)
         self.append(self._action)
@@ -384,7 +384,7 @@ class MediaItem(gui.VBox):
         self._name.css_opacity = "0.5" if active else "1.0"
 
 # TODO: commonize with SlotList
-class MediaList(gui.VBox):
+class MediaList(remi.gui.VBox):
     _list: Dict[str, MediaItem]
     _active: str
     _selected: str
@@ -437,7 +437,7 @@ class MediaList(gui.VBox):
     def set_media_action(self, filename: str, action: str):
         self._single(filename, "set_media_action", action)
 
-class PSBerry(App):
+class PSBerry(remi.App):
     _state: State
     _slot_list: SlotList
     _slot_buttons: SlotButtons
@@ -450,7 +450,7 @@ class PSBerry(App):
 
     def main(self, state: State):
         self._state = state
-        container = gui.VBox(width="100%", style=self._CONTAINER_STYLE)
+        container = remi.gui.VBox(width="100%", style=self._CONTAINER_STYLE)
 
         mode_panel = ModePanel()
         fs_active_panel = FilesystemActivePanel()
@@ -468,8 +468,8 @@ class PSBerry(App):
 
         return container
 
-    def _save_manager(self) -> Tuple[str, gui.Container]:
-        save_manager = gui.VBox(width="100%")
+    def _save_manager(self) -> Tuple[str, remi.gui.Container]:
+        save_manager = remi.gui.VBox(width="100%")
 
         self._slot_list = SlotList(self._on_slot_edit, self._on_slot_select)
         save_manager.append(self._slot_list)
@@ -479,13 +479,13 @@ class PSBerry(App):
 
         return "Save Manager", save_manager
 
-    def _media_uploader(self) -> Tuple[str, gui.Container]:
-        media_uploader = gui.VBox(width="100%")
+    def _media_uploader(self) -> Tuple[str, remi.gui.Container]:
+        media_uploader = remi.gui.VBox(width="100%")
 
         self._media_list = MediaList(self._on_media_upload)
         media_uploader.append(self._media_list)
 
-        media_uploader.append(gui.Button("Configure Remotes", width="60%", height=30, margin="5px 20%"))
+        media_uploader.append(remi.gui.Button("Configure Remotes", width="60%", height=30, margin="5px 20%"))
 
         return "Media Uploader", media_uploader
 
@@ -539,11 +539,11 @@ def main():
 
     state.write("drivers", [
         # TODO: move this to UI configuration
-        DriverSMB("remote", "folder", "username", "password")
+        #DriverSMB("remote", "folder", "username", "password")
     ])
 
     with (SystemMock if args.mock else System)(state, args.block, args.mount):
-        start(PSBerry, address="0.0.0.0", port=8080, start_browser=args.browser, debug=args.debug, userdata=(state,))
+        remi.start(PSBerry, address="0.0.0.0", port=8080, start_browser=args.browser, debug=args.debug, userdata=(state,))
 
 if __name__ == "__main__":
     main()
