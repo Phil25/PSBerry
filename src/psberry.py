@@ -4,10 +4,12 @@ from drivers import DriverSMB
 from operations import ChangeSlot, CreateSlot, DeleteSlot, EditSlot, TransferFiles
 from typing import Dict, Tuple
 from enum import IntFlag
+from collections import namedtuple
 from system import System, SystemMock
 from remi import gui, start, App
 from utils.mode import Mode
 from utils.state import State
+from utils.funcs import format_bytes
 
 class ModePanel(gui.HBox):
     _icon: gui.Image
@@ -325,25 +327,64 @@ class StaticTabBox(gui.VBox):
         button.style["border-style"] = "none"
 
 class MediaItem(gui.VBox):
-    _name: str
+    Size = namedtuple("Size", ["number", "string"])
+
+    _size: Size
+    _filename: str
+    _active_cycle: int
+    _last_percentage: int
+    _name: gui.Label
+    _action: gui.Label
+    _progress: gui.Label
     _bar: gui.Progress
 
-    def __init__(self, name: str, data, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._name = name
-        self._data = data
-        self._bar = gui.Progress()
+    _STYLE = {
+        "border-style": "none none none solid",
+        "margin": "5px",
+        "padding": "5px",
+    }
 
-        self.append(gui.Label(name, width="100%", style={"text-align": "left", "font-weight": "bold"}))
+    def __init__(self, filename: str, *args, **kwargs):
+        super().__init__(width="95%", style=self._STYLE, *args, **kwargs)
+
+        self.set_media_size(0)
+        self._filename = filename
+        self._active_cycle = 0
+        self._last_percentage = 0
+
+        self._name = gui.Label(filename, width="100%", style={"text-align": "left", "font-weight": "bold"})
+        self._action = gui.Label("", width="100%", style={"text-align": "left", "opacity": "0.5"})
+        self._progress = gui.Label("", width="100%", style={"text-align": "left", "opacity": "0.5"})
+        self._bar = gui.Progress(width="100%")
+
+        self.append(self._name)
+        self.append(self._action)
+        self.append(self._progress)
         self.append(self._bar)
 
-    def progress(self, cur: int, size: int):
-        percentage = int(cur / size * 100)
+    def set_media_size(self, size: int):
+        self._size = self.Size(size, format_bytes(size))
+
+    def set_media_progress(self, current: int):
+        percentage = int(current / self._size.number * 100)
+        if self._last_percentage == percentage:
+            # this function can be called a bit too often for my taste
+            return
+
+        self._progress.set_text(f"{percentage}%: {format_bytes(current)}/{self._size.string}")
         self._bar.set_value(percentage)
+        self._last_percentage = percentage
+
+    def set_media_action(self, action: str):
+        self._action.set_text(action)
+
+    def update_active(self, active: bool):
+        self._active_cycle = self._active_cycle + 1 if active else 0
+        self._name.set_text(f"{self._filename}{'.' * (self._active_cycle % 4)}")
+        self._name.css_opacity = "0.5" if active else "1.0"
 
 # TODO: commonize with SlotList
 class MediaList(gui.VBox):
-    # TODO: this could be a list, maybe keeping it as Dict will help with commonizing
     _list: Dict[str, MediaItem]
     _active: str
     _selected: str
@@ -354,22 +395,30 @@ class MediaList(gui.VBox):
         self._on_media_upload = on_media_upload
 
     def update_items(self, media_data):
+        self._update_active(media_data)
+
         if len(self.children) == len(media_data):
             return
 
         self._rebuild(media_data)
 
         if len(media_data):
-            self._on_media_upload(media_data, self._progress)
+            self._on_media_upload(media_data, self)
+
+    def _update_active(self, media_data):
+        for media, data in media_data.items():
+            self._single(media, "update_active", data["is_active"])
 
     def _rebuild(self, media_data):
         self.empty()
         self._list.clear()
 
-        for name, data in media_data.items():
-            item = MediaItem(name, data)
+        for name in media_data.keys():
+            item = MediaItem(name)
             self._list[name] = item
             self.append(item)
+
+        self._update_active(media_data)
 
     def _all(self, func: str, *args, **kwargs):
         for item in self._list.values():
@@ -379,8 +428,14 @@ class MediaList(gui.VBox):
         if key in self._list:
             getattr(self._list[key], func)(*args, **kwargs)
 
-    def _progress(self, filename: str, cur: int, size: int):
-        self._single(filename, "progress", cur, size)
+    def set_media_size(self, filename: str, size: int):
+        self._single(filename, "set_media_size", size)
+
+    def set_media_progress(self, filename: str, cur: int):
+        self._single(filename, "set_media_progress", cur)
+
+    def set_media_action(self, filename: str, action: str):
+        self._single(filename, "set_media_action", action)
 
 class PSBerry(App):
     _state: State
@@ -464,10 +519,10 @@ class PSBerry(App):
     def _on_slot_create(self, clone_active: bool):
         self._state.queue_operation(CreateSlot(clone_active=clone_active))
 
-    def _on_media_upload(self, media_data, progress):
+    def _on_media_upload(self, media_data, listener):
         drivers = self._state.read("drivers")
         if len(drivers):
-            self._state.queue_operation(TransferFiles(media_data, drivers, progress))
+            self._state.queue_operation(TransferFiles(media_data, drivers, listener))
 
 def get_args():
     parser = argparse.ArgumentParser(description="Start PSBerry.")

@@ -59,10 +59,7 @@ class SystemBase():
                     file_path = os.path.join(game_dir, media)
                     data = os.stat(file_path)
                     current_data = current["media"].get(media)
-                    is_active = False
-
-                    if current_data is not None:
-                        is_active = current_data["last_access"] != data.st_atime_ns
+                    is_active = True if current_data is None else current_data["last_access"] != data.st_atime_ns
 
                     fs["media"][media] = {
                         "last_access": data.st_atime_ns,

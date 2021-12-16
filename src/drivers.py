@@ -7,7 +7,7 @@ class DriverBase():
     def __init__(self) -> None:
         pass
 
-    def upload(self, source: str, filename: str, progress) -> bool:
+    def upload(self, source: str, filename: str, listener) -> bool:
         return False
 
     @property
@@ -25,13 +25,14 @@ class DriverSMB(DriverBase):
         self._chunk_size = chunk_size
         smb.register_session(remote, username=username, password=password)
 
-    def upload(self, source: str, filename: str, progress) -> bool:
-        size = os.stat(source).st_size
+    def upload(self, source: str, filename: str, listener) -> bool:
+        listener.set_media_size(filename, os.stat(source).st_size)
         effective_file = re.sub(r"[^\w\-_\. ]", "_", filename)
         destination = fr"{self._remote_root}\{effective_file}"
 
         hash_src = hashlib.md5()
         hash_dst = hashlib.md5()
+        listener.set_media_action(filename, f"Uploading to {self._remote_root}...")
 
         with open(source, mode="rb") as src:
             with smb.open_file(destination, mode="wb") as dst:
@@ -40,11 +41,16 @@ class DriverSMB(DriverBase):
                     dst.write(chunk)
                     hash_src.update(chunk)
                     copied_bytes += len(chunk)
-                    progress(filename, copied_bytes, size)
+                    listener.set_media_progress(filename, copied_bytes)
+
+        listener.set_media_action(filename, f"Verifying checksum...")
 
         with smb.open_file(destination, mode="rb") as dst:
+            verified_bytes = 0
             while chunk := dst.read(self._chunk_size):
                 hash_dst.update(chunk)
+                verified_bytes += len(chunk)
+                listener.set_media_progress(filename, verified_bytes)
 
         return hash_src.hexdigest() == hash_dst.hexdigest()
 
