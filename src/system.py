@@ -81,7 +81,7 @@ class SystemBase():
         self._update_media(fs)
 
         # return if the write happened, i.e. filesystem changed
-        return self._state.write("filesystem", fs)
+        return self._state.write("filesystem", fs) or self._block_storage_written_to()
 
     def _update_idle(self, active: bool):
         self._state.write("fs_active", active)
@@ -116,6 +116,9 @@ class SystemBase():
 
         self._state.write("mode", mode)
 
+    def _block_storage_written_to(self) -> bool:
+        return False
+
     def _mount(self, readonly: bool) -> "SystemBase":
         print(f"Mounted {self._block_storage} under {self._mount_point} as readonly={readonly}", flush=True)
         return self
@@ -133,6 +136,16 @@ class SystemBase():
         return self
 
 class System(SystemBase):
+    _last_modify_time = 0
+
+    def _block_storage_written_to(self) -> bool:
+        modify_time = os.stat(self._block_storage).st_ctime_ns
+
+        result = self._last_modify_time != modify_time
+        self._last_modify_time = modify_time
+
+        return result
+
     def _mount(self, readonly: bool) -> SystemBase:
         mode = "ro" if readonly else "rw"
         sp.run(f"sudo mount -o defaults,loop,{mode} {self._block_storage} {self._mount_point}", shell=True)
