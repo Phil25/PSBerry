@@ -1,28 +1,76 @@
 import os
 import re
 import hashlib
+from typing import Dict, List, Tuple
 import smbclient as smb
 
+_EMPTY_DRIVER = "None (removes driver)"
+
 class DriverBase():
-    def __init__(self) -> None:
-        pass
+    _config: Dict
+
+    empty_driver = _EMPTY_DRIVER
+    description = "No driver implementation provided."
+    fields = []
+
+    def __init__(self, config: Dict) -> None:
+        self._config = dict(config, **{"__description__": self.description})
 
     def upload(self, source: str, filename: str, listener) -> bool:
         return False
 
     @property
-    def error(self):
+    def error(self) -> str:
         return "No driver implementation provided."
+
+    @property
+    def config(self):
+        return self._config
+
+    @classmethod
+    def get_descriptions(cls):
+        return [c.description for c in cls.__subclasses__()]
+
+    @classmethod
+    def get_fields(cls, description: str) -> List[Tuple[str, str]]:
+        for c in cls.__subclasses__():
+            if c.description == description:
+                return c.fields
+        assert False, f"Invalid description: \"{description}\"."
+
+    @classmethod
+    def from_description(cls, description: str, config: Dict) -> "DriverBase":
+        if description == _EMPTY_DRIVER:
+            return None
+
+        for c in cls.__subclasses__():
+            if c.description == description:
+                return c(config)
+
+        assert False, f"Invalid description: \"{description}\"."
+
+
+class DriverRemover(DriverBase):
+    description = _EMPTY_DRIVER
 
 
 class DriverSMB(DriverBase):
     _remote_root: str
     _chunk_size: int
 
-    def __init__(self, remote: str, folder: str, username: str, password: str, chunk_size: int=8192) -> None:
-        super().__init__()
+    description = "SMB/Samba server"
+    fields = [
+        ("remote", "text"),
+        ("folder", "text"),
+        ("username", "text"),
+        ("password", "password"),
+    ]
+
+    def __init__(self, config: Dict) -> None:
+        super().__init__(config)
+        remote, folder, username, password = config["remote"], config["folder"], config["username"], config["password"]
         self._remote_root = fr"\\{remote}\{folder}"
-        self._chunk_size = chunk_size
+        self._chunk_size = 8192
         smb.register_session(remote, username=username, password=password)
 
     def upload(self, source: str, filename: str, listener) -> bool:
@@ -53,9 +101,3 @@ class DriverSMB(DriverBase):
                 listener.set_media_progress(filename, verified_bytes)
 
         return hash_src.hexdigest() == hash_dst.hexdigest()
-
-
-def get_class(name: str):
-    return {
-        "smb": DriverSMB
-    }[name]

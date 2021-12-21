@@ -2,7 +2,7 @@ import argparse
 import pathlib
 import remi
 import gui
-from drivers import DriverSMB
+from drivers import DriverBase
 from operations import ChangeSlot, CreateSlot, DeleteSlot, EditSlot, TransferFiles
 from typing import Tuple
 from system import System, SystemMock
@@ -56,7 +56,9 @@ class PSBerry(remi.App):
         self._media_list = gui.MediaList(self._on_media_upload)
         media_uploader.append(self._media_list)
 
-        media_uploader.append(remi.gui.Button("Configure Remotes", width="60%", height=30, margin="5px 20%"))
+        configure_remotes = remi.gui.Button("Configure Remotes", width="60%", height=30, margin="5px 20%")
+        configure_remotes.onclick.do(self._on_remotes_edit)
+        media_uploader.append(configure_remotes)
 
         return "Media Uploader", media_uploader
 
@@ -95,6 +97,17 @@ class PSBerry(remi.App):
         if len(drivers):
             self._state.queue_operation(TransferFiles(media_data, drivers, listener))
 
+    def _on_remotes_edit(self, button: remi.gui.Button):
+        config = [d.config for d in self._state.read("drivers")]
+        dialog = gui.ConfigureRemotesDialog(config, DriverBase.empty_driver, style=self._CONTAINER_STYLE)
+        dialog.confirm_dialog.do(self._save_remotes_configuration)
+        dialog.show(self)
+
+    def _save_remotes_configuration(self, dialog: gui.ConfigureRemotesDialog):
+        drivers = [DriverBase.from_description(c["__description__"], c) for c in dialog.get_configs()]
+        drivers = [d for d in drivers if d is not None]
+        self._state.write("drivers", drivers)
+
 def get_args():
     parser = argparse.ArgumentParser(description="Start PSBerry.")
     parser.add_argument("--mock", "-m", default=False, action=argparse.BooleanOptionalAction, help="Use mocked system operations.")
@@ -107,11 +120,6 @@ def get_args():
 def main():
     args = get_args()
     state = State()
-
-    state.write("drivers", [
-        # TODO: move this to UI configuration
-        #DriverSMB("remote", "folder", "username", "password")
-    ])
 
     with (SystemMock if args.mock else System)(state, args.block, args.mount):
         remi.start(PSBerry, address="0.0.0.0", port=8080, start_browser=args.browser, debug=args.debug, userdata=(state,))

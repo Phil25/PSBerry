@@ -1,4 +1,6 @@
 import remi
+from typing import Dict, List
+from gui.item_list import RemotesList
 
 class SlotEditDialog(remi.gui.GenericDialog):
     _slot_id: str
@@ -8,7 +10,7 @@ class SlotEditDialog(remi.gui.GenericDialog):
     _DEL = "key_delete_slider"
 
     def __init__(self, slot_id: str, data, *args, **kwargs):
-        super().__init__(title=f"Edit slot properties", message=f"Editing slot {slot_id}.", *args, **kwargs)
+        super().__init__(title="Edit slot properties", message=f"Editing slot {slot_id}.", *args, **kwargs)
         self.conf.set_text("Apply")
         self._slot_id = slot_id
 
@@ -34,3 +36,29 @@ class SlotEditDialog(remi.gui.GenericDialog):
 
     def is_maked_for_deletion(self) -> bool:
         return self.get_field(self._DEL).get_value() == "100"
+
+class ConfigureRemotesDialog(remi.gui.GenericDialog):
+    _configs: List[Dict]
+    _empty_driver: str
+
+    def __init__(self, configs: List[Dict], empty_driver: str, *args, **kwargs):
+        super().__init__(title="Configure remotes", message="Manage remote locations to upload media to.", *args, **kwargs)
+        self._configs = configs
+        self._empty_driver = empty_driver
+
+        self.conf.set_text("Save")
+
+        remotes = RemotesList()
+        remotes.update_items(self._configs)
+        self.add_field("remotes", remotes)
+
+        add_button = remi.gui.Button("Add new remote configuration", width="60%", height=30, margin="5px 20%")
+        add_button.onclick.do(self._add_remote)
+        self.add_field("add_button", add_button)
+
+    def _add_remote(self, button: remi.gui.Button):
+        self._configs.append({"__description__": self._empty_driver})
+        self.get_field("remotes").update_items(self._configs)
+
+    def get_configs(self) -> List[Dict]:
+        return self._configs

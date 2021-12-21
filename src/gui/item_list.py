@@ -1,8 +1,9 @@
 import remi
 from enum import IntFlag
 from collections import namedtuple
-from typing import Dict, Generic, TypeVar
+from typing import Dict, Generic, List, TypeVar
 from operations import ChangeSlot, DeleteSlot
+from drivers import DriverBase
 from utils.funcs import format_bytes
 
 _STYLE = {
@@ -12,12 +13,13 @@ _STYLE = {
         "cursor": "pointer"
     },
     "static": {
-        "border-style": "none none none solid",
+        "border-style": "solid none none none",
         "margin": "5px",
         "padding": "5px",
     },
     "title": {"text-align": "left", "font-weight": "bold"},
     "subtitle": {"text-align": "left", "font-style": "italic", "opacity": "0.5"},
+    "button": {"margin": "10px", "background": "none", "border-style": "ridge", "font-size": "26px"},
 }
 
 class SlotItem(remi.gui.HBox):
@@ -40,7 +42,7 @@ class SlotItem(remi.gui.HBox):
         self._desc = remi.gui.Label("", width="100%", style=_STYLE["subtitle"])
         self._update_color()
 
-        self._menu = remi.gui.Button(text="☰", width="15%", style={"margin": "10px", "background": "none", "border-style": "ridge", "font-size": "26px"})
+        self._menu = remi.gui.Button(text="☰", width="15%", style=_STYLE["button"])
         self._menu.onclick.do(lambda c : on_context(slot_id))
         self.append(self._menu)
 
@@ -156,6 +158,35 @@ class MediaItem(remi.gui.VBox):
         self._name.set_text(f"{self._filename}{'.' * (self._active_cycle % 4)}")
         self._name.css_opacity = "0.5" if active else "1.0"
 
+class RemoteItem(remi.gui.GenericDialog):
+    _config: Dict
+
+    def __init__(self, config: Dict, *args, **kwargs):
+        super().__init__(width="95%", style=_STYLE["static"], *args, **kwargs)
+        assert "__description__" in config
+        self.remove_child(self.get_child("buttons_container"))
+        self._config = config
+
+        dropdown = remi.gui.DropDown.new_from_list(DriverBase.get_descriptions())
+        dropdown.select_by_value(config["__description__"])
+
+        self._update_fields(dropdown, config["__description__"])
+        dropdown.onchange.do(self._update_fields)
+
+    def _update_fields(self, dropdown: remi.gui.DropDown, description: str):
+        self.container.empty()
+        self.add_field_with_label("__description__", "Driver", dropdown)
+        self._config["__description__"] = description
+
+        for field_name, field_type in DriverBase.get_fields(description):
+            default = self._config[field_name] if field_name in self._config else ""
+            field = remi.gui.Input(input_type=field_type, default_value=default)
+            field.onchange.do(self._on_field_update, field_name)
+            self.add_field_with_label(field_name, field_name.capitalize(), field)
+
+    def _on_field_update(self, field: remi.gui.Input, value, field_name: str):
+        self._config[field_name] = value
+
 ItemType = TypeVar("ItemType")
 
 class _ItemList(Generic[ItemType], remi.gui.VBox):
@@ -172,6 +203,9 @@ class _ItemList(Generic[ItemType], remi.gui.VBox):
     def _single(self, key: str, func: str, *args, **kwargs):
         if key in self._list:
             getattr(self._list[key], func)(*args, **kwargs)
+
+    def update_items(self, data):
+        self._rebuild(data)
 
     def _rebuild(self, data):
         self.empty()
@@ -264,3 +298,8 @@ class MediaList(_ItemList[MediaItem]):
 
     def set_media_action(self, filename: str, action: str):
         self._single(filename, "set_media_action", action)
+
+class RemotesList(_ItemList[RemoteItem]):
+    def _build(self, configs: List[Dict]):
+        for i, config in enumerate(configs):
+            self.append(RemoteItem(config), str(i))

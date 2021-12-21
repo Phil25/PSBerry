@@ -30,7 +30,7 @@ class State():
 
     def read(self, field):
         with self._lock:
-            return self._data.get(field)
+            return deepcopy(self._data.get(field))
 
     def write(self, field: str, value):
         with self._lock:
