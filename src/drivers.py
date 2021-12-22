@@ -8,20 +8,52 @@ _EMPTY_DRIVER = "None (removes driver)"
 
 class DriverBase():
     _config: Dict
+    _errors: List[str]
 
     empty_driver = _EMPTY_DRIVER
     description = "No driver implementation provided."
     fields = []
+    required_fields = []
 
     def __init__(self, config: Dict) -> None:
         self._config = dict(config, **{"__description__": self.description})
+        self._errors = []
 
-    def upload(self, source: str, filename: str, listener) -> bool:
-        return False
+        for field in self.required_fields:
+            if field not in config or not config[field]:
+                self._errors.append(f"Missing field \"{field}\".")
+
+        if not self._errors:
+            self._errors.extend(self._connect())
 
     @property
-    def error(self) -> str:
+    def errors(self) -> List[str]:
+        return self._errors
+
+    def _connect(self) -> List[str]:
+        """
+        Individual drivers attempt connecting and testing here,
+        returning list of errors. Performing any action is optional,
+        but implementation must be specified. This won't be called
+        if required fields are missing.
+        """
+        return ["No driver implementation provided."]
+
+    @property
+    def destination(self) -> str:
+        """
+        Human-readable destination which this driver uploads files to.
+        """
         return "No driver implementation provided."
+
+    def upload(self, source: str, filename: str, listener) -> bool:
+        return False if self._errors else self._upload(source, filename, listener)
+
+    def _upload(self, source: str, filename: str, listener):
+        """
+        Individual drivers upload file from source to {remote}/filename here.
+        """
+        return False
 
     @property
     def config(self):
@@ -70,15 +102,27 @@ class DriverSMB(DriverBase):
         ("username", "text"),
         ("password", "password"),
     ]
+    required_fields = ["remote", "folder"]
 
     def __init__(self, config: Dict) -> None:
-        super().__init__(config)
-        remote, folder, username, password = config["remote"], config["folder"], config["username"], config["password"]
+        remote, folder = config.get("remote", ""), config.get("folder", "")
         self._remote_root = fr"\\{remote}\{folder}"
         self._chunk_size = 8192
-        smb.register_session(remote, username=username, password=password)
+        super().__init__(config)
 
-    def upload(self, source: str, filename: str, listener) -> bool:
+    def _connect(self) -> List[str]:
+        try:
+            smb.register_session(self._config["remote"], username=self._config.get("username"), password=self._config.get("password"))
+            smb.stat(self._remote_root) # test
+        except Exception as e:
+            return [str(e)]
+        return []
+
+    @property
+    def destination(self) -> str:
+        return self._remote_root
+
+    def _upload(self, source: str, filename: str, listener) -> bool:
         listener.set_media_size(filename, os.stat(source).st_size)
         effective_file = re.sub(r"[^\w\-_\. ]", "_", filename)
         destination = fr"{self._remote_root}\{effective_file}"

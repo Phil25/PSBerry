@@ -54,3 +54,8 @@ class StaticTabBox(remi.gui.VBox):
     def _disable_button(self, button: remi.gui.Button):
         button.style["background-color"] = "#cceef7"
         button.style["border-style"] = "none"
+
+class StaticTextArea(remi.gui.TextInput):
+    def __init__(self, single_line=True, hint="", *args, **kwargs):
+        super().__init__(single_line=single_line, hint=hint, *args, **kwargs)
+        self.type = "textarea readonly wrap=\"off\""
