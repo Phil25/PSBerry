@@ -1,15 +1,9 @@
+import pickle
+from pathlib import Path
 from threading import Lock
 from copy import deepcopy
-from typing import Dict
+from typing import Dict, List
 
-"""
-Expected operations:
-- DeleteFile
-- ChangeSlot
-- CreateSlot
-- DeleteSlot
-- EditSlot
-"""
 class OperationBase():
     @property
     def overview(self) -> str:
@@ -18,11 +12,42 @@ class OperationBase():
     def run(self, mount_point: str):
         assert False, "Operation not defined"
 
+class Options():
+    _remotes = List[Dict]
+
+    _FILE = "psberry_options.pickle"
+
+    def __init__(self) -> None:
+        self._remotes = []
+
+        if not Path(self._FILE).is_file():
+            return
+
+        with open(self._FILE, "rb") as f:
+            data = pickle.load(f)
+
+        self._remotes = data[0]
+
+    def _dump(self):
+        data = [self._remotes]
+        with open(self._FILE, "wb") as f:
+            pickle.dump(data, f)
+
+    @property
+    def remotes(self) -> List[Dict]:
+        return self._remotes
+
+    @remotes.setter
+    def remotes(self, value: List[Dict]):
+        self._remotes = value
+        self._dump()
+
 class State():
     def __init__(self) -> None:
         self._lock = Lock()
         self._data = {"operations": {}, "filesystem": {"slots": {}, "active_slot": "", "media": {}}, "drivers": []}
         self._listeners = {}
+        self._options = Options()
 
     def _call_listeners(self, field: str, value):
         for callback in self._listeners.get(field, []):
@@ -66,3 +91,7 @@ class State():
 
         self._call_listeners("operations", {})
         return ops
+
+    @property
+    def options(self):
+        return self._options

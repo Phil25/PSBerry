@@ -49,6 +49,11 @@ class DriverBase():
 
         assert False, f"Invalid description: \"{description}\"."
 
+    @classmethod
+    def from_configs(cls, configs: List[Dict]) -> List["DriverBase"]:
+        drivers = [cls.from_description(c["__description__"], c) for c in configs]
+        return [d for d in drivers if d is not None]
+
 
 class DriverRemover(DriverBase):
     description = _EMPTY_DRIVER

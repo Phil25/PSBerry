@@ -104,9 +104,8 @@ class PSBerry(remi.App):
         dialog.show(self)
 
     def _save_remotes_configuration(self, dialog: gui.ConfigureRemotesDialog):
-        drivers = [DriverBase.from_description(c["__description__"], c) for c in dialog.get_configs()]
-        drivers = [d for d in drivers if d is not None]
-        self._state.write("drivers", drivers)
+        self._state.options.remotes = dialog.get_configs()
+        self._state.write("drivers", DriverBase.from_configs(dialog.get_configs()))
 
 def get_args():
     parser = argparse.ArgumentParser(description="Start PSBerry.")
@@ -120,6 +119,8 @@ def get_args():
 def main():
     args = get_args()
     state = State()
+
+    state.write("drivers", DriverBase.from_configs(state.options.remotes))
 
     with (SystemMock if args.mock else System)(state, args.block, args.mount):
         remi.start(PSBerry, address="0.0.0.0", port=8080, start_browser=args.browser, debug=args.debug, userdata=(state,))
