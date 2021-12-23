@@ -5,6 +5,8 @@ def ensure_list_size_with_default(l, size: int, default):
     return l[0:2]
 
 def get_save_dirs(loc):
+    if not os.path.exists(loc):
+        return []
     return [d for d in os.listdir(loc) if "SAVEDATA" in d]
 
 def get_active_slot(saves):

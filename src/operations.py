@@ -135,6 +135,10 @@ class CreateSlot(OperationBase):
 
     def run(self, mount_point: str):
         loc = os.path.join(mount_point, "PS4")
+
+        if not os.path.exists(loc):
+            os.mkdir(loc)
+
         slot_count = len(get_save_dirs(loc))
         slot_id = f"Slot_{slot_count + 1}"
 

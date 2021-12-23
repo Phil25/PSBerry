@@ -1,12 +1,15 @@
 import argparse
-import pathlib
 import remi
 import gui
-from drivers import DriverBase
-from operations import ChangeSlot, CreateSlot, DeleteSlot, EditSlot, TransferFiles
+from pathlib import Path
+from os import path
 from typing import Tuple
+from operations import ChangeSlot, CreateSlot, DeleteSlot, EditSlot, TransferFiles
+from drivers import DriverBase
 from system import System, SystemMock
 from utils.state import State
+
+ROOT = path.dirname(path.abspath(__file__))
 
 class PSBerry(remi.App):
     _state: State
@@ -17,10 +20,11 @@ class PSBerry(remi.App):
     _CONTAINER_STYLE = {"margin": "0px auto", "max-width": "400px"}
 
     def __init__(self, *args):
-        super(PSBerry, self).__init__(*args, static_file_path={"root": "."})
+        super(PSBerry, self).__init__(*args, static_file_path={"root": path.join(ROOT, "..")})
 
     def main(self, state: State):
         self._state = state
+
         container = remi.gui.VBox(width="100%", style=self._CONTAINER_STYLE)
 
         mode_panel = gui.ModePanel()
@@ -112,18 +116,18 @@ def get_args():
     parser.add_argument("--mock", "-m", default=False, action=argparse.BooleanOptionalAction, help="Use mocked system operations.")
     parser.add_argument("--debug", "-d", default=False, action=argparse.BooleanOptionalAction, help="Launch Remi web app in debug mode.")
     parser.add_argument("--browser", "-b", default=False, action=argparse.BooleanOptionalAction, help="Launch browser.")
-    parser.add_argument("--block", default="/storage.bin", type=pathlib.Path, help="Block storage location.")
-    parser.add_argument("--mount", default="/home/pi/storage", type=pathlib.Path, help="Local mount point directory for the USB block storage.")
+    parser.add_argument("--block", default="/home/pi/storage.bin", type=Path, help="Block storage location.")
+    parser.add_argument("--mount", default="/home/pi/mount", type=Path, help="Local mount point directory for the USB block storage.")
     return parser.parse_args()
 
 def main():
     args = get_args()
-    state = State()
+    state = State(ROOT)
 
     state.write("drivers", DriverBase.from_configs(state.options.remotes))
 
     with (SystemMock if args.mock else System)(state, args.block, args.mount):
-        remi.start(PSBerry, address="0.0.0.0", port=8080, start_browser=args.browser, debug=args.debug, userdata=(state,))
+        remi.start(PSBerry, address="0.0.0.0", port=8080 if args.mock else 80, start_browser=args.browser, debug=args.debug, userdata=(state,))
 
 if __name__ == "__main__":
     main()

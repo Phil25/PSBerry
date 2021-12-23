@@ -13,24 +13,26 @@ class OperationBase():
         assert False, "Operation not defined"
 
 class Options():
-    _remotes = List[Dict]
+    _file: Path
+    _remotes: List[Dict]
 
     _FILE = "psberry_options.pickle"
 
-    def __init__(self) -> None:
+    def __init__(self, root: str) -> None:
+        self._file = Path(root) / self._FILE
         self._remotes = []
 
-        if not Path(self._FILE).is_file():
+        if not Path(self._file).is_file():
             return
 
-        with open(self._FILE, "rb") as f:
+        with open(self._file, "rb") as f:
             data = pickle.load(f)
 
         self._remotes = data[0]
 
     def _dump(self):
         data = [self._remotes]
-        with open(self._FILE, "wb") as f:
+        with open(self._file, "wb") as f:
             pickle.dump(data, f)
 
     @property
@@ -43,11 +45,11 @@ class Options():
         self._dump()
 
 class State():
-    def __init__(self) -> None:
+    def __init__(self, root: str) -> None:
         self._lock = Lock()
         self._data = {"operations": {}, "filesystem": {"slots": {}, "active_slot": "", "media": {}}, "drivers": []}
         self._listeners = {}
-        self._options = Options()
+        self._options = Options(root)
 
     def _call_listeners(self, field: str, value):
         for callback in self._listeners.get(field, []):
