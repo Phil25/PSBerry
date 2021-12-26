@@ -9,7 +9,7 @@ from drivers import DriverBase
 from system import System, SystemMock
 from utils.state import State
 
-ROOT = path.dirname(path.abspath(__file__))
+ROOT = path.dirname(path.dirname(path.abspath(__file__)))
 
 class PSBerry(remi.App):
     _state: State
@@ -20,7 +20,7 @@ class PSBerry(remi.App):
     _CONTAINER_STYLE = {"margin": "0px auto", "max-width": "400px"}
 
     def __init__(self, *args):
-        super(PSBerry, self).__init__(*args, static_file_path={"root": path.join(ROOT, "..")})
+        super(PSBerry, self).__init__(*args, static_file_path={"root": ROOT})
 
     def main(self, state: State):
         self._state = state
@@ -123,11 +123,13 @@ def get_args():
 def main():
     args = get_args()
     state = State(ROOT)
+    port = 8080 if args.mock else 80
+    font = "arial.ttf" if args.mock else "DejaVuSansMono.ttf"
 
     state.write("drivers", DriverBase.from_configs(state.options.remotes))
 
-    with (SystemMock if args.mock else System)(state, args.block, args.mount):
-        remi.start(PSBerry, address="0.0.0.0", port=8080 if args.mock else 80, start_browser=args.browser, debug=args.debug, userdata=(state,))
+    with (SystemMock if args.mock else System)(state, args.block, args.mount, port, font):
+        remi.start(PSBerry, address="0.0.0.0", port=port, start_browser=args.browser, debug=args.debug, userdata=(state,))
 
 if __name__ == "__main__":
     main()

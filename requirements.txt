@@ -1,3 +1,5 @@
 cryptography==36.0.0 # 36.0.1 causes issues; 36.0.1+ not tested
 remi==2021.3.2
 smbprotocol==1.8.3
+qrcode==7.3.1
+Pillow==8.4.0

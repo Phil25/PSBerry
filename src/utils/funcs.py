@@ -1,4 +1,5 @@
 import os
+import socket
 
 def ensure_list_size_with_default(l, size: int, default):
     l.extend([default] * size)
@@ -30,3 +31,15 @@ def format_bytes(num, suffix="B"):
             return f"{num:3.1f}{unit}{suffix}"
         num /= 1024.0
     return f"{num:.1f}Yi{suffix}"
+
+# https://stackoverflow.com/a/28950776/13156175
+def get_address():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("10.255.255.255", 1))
+        address = s.getsockname()[0]
+    except Exception:
+        address = "127.0.0.1"
+    finally:
+        s.close()
+    return address

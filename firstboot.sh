@@ -11,8 +11,8 @@ echo "dtoverlay=dwc2" | tee -a /boot/config.txt
 echo "Enabling dwc2 kernel module..."
 echo "dwc2" | tee -a /etc/modules
 
-echo "Installing exfat formatting utility and pip..."
-apt install -y exfat-utils pip
+echo "Installing exfat formatting utility, pip and image compression library..."
+apt install -y exfat-utils pip libopenjp2-7
 
 echo "Creating backing storage with 90% the size of free space..."
 FREE_BYTES=$(df -P -B1 / | tail -1 | awk '{print $4}')

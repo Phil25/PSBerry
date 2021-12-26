@@ -1,5 +1,7 @@
 import os
 import shutil
+import qrcode
+from PIL import Image, ImageDraw, ImageFont
 from copy import deepcopy
 from typing import List
 from drivers import DriverBase
@@ -191,3 +193,43 @@ class TransferFiles(OperationBase):
         for k, v in self.__dict__.items():
             setattr(result, k, v if k == "_listener" else deepcopy(v, memo))
         return result
+
+class UpdateAddress(OperationBase):
+    _SIZE = 64
+
+    _address: str
+    _port: int
+    _font: str
+
+    def __init__(self, address: str, port: int, font: str) -> None:
+        super().__init__()
+        self._address = address
+        self._port = port
+        self._font = font
+
+    @property
+    def overview(self) -> str:
+        return f"Updating address to \"{self._address}\"."
+
+    def run(self, mount_point: str):
+        loc = os.path.join(mount_point, "My Address")
+
+        if not os.path.exists(loc):
+            os.mkdir(loc)
+
+        with open(os.path.join(loc, "address.txt"), mode="w") as f:
+            f.write(self._address)
+
+        font = ImageFont.truetype(self._font, self._SIZE - 4)
+        width = self._SIZE * 10
+
+        img = Image.new("L", (width, self._SIZE), color=255)
+        draw = ImageDraw.Draw(img)
+        w, _ = draw.textsize(self._address, font)
+
+        draw.text(((width - w) / 2, 0), self._address, "black", font)
+        img.save(os.path.join(loc, "address.png"))
+
+        qrcode \
+            .make(f"http://{self._address}:{self._port}") \
+            .save(os.path.join(loc, "address_qr.png"))
