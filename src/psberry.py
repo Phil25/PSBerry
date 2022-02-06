@@ -98,8 +98,13 @@ class PSBerry(remi.App):
 
     def _on_media_upload(self, media_data, listener):
         drivers = self._state.read("drivers")
-        if len(drivers):
+        if not len(drivers):
+            return
+
+        if len(media_data):
             self._state.queue_operation(TransferFiles(media_data, drivers, listener))
+        else:
+            self._state.cancel_operation(TransferFiles)
 
     def _on_remotes_edit(self, button: remi.gui.Button):
         config = [d.config for d in self._state.read("drivers")]

@@ -2,7 +2,7 @@ import pickle
 from pathlib import Path
 from threading import Lock
 from copy import deepcopy
-from typing import Dict, List
+from typing import Dict, List, Type
 
 class OperationBase():
     @property
@@ -80,6 +80,15 @@ class State():
             assert "operations" in self._data
 
             self._data["operations"][type(op).__name__] = op
+            data = deepcopy(self._data["operations"])
+
+        self._call_listeners("operations", data)
+
+    def cancel_operation(self, op_type: Type[OperationBase]):
+        with self._lock:
+            assert "operations" in self._data
+
+            self._data["operations"].pop(op_type.__name__, None)
             data = deepcopy(self._data["operations"])
 
         self._call_listeners("operations", data)

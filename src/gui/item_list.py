@@ -299,9 +299,7 @@ class MediaList(_ItemList[MediaItem]):
             return
 
         self._rebuild(media_data)
-
-        if len(media_data):
-            self._on_media_upload(media_data, self)
+        self._on_media_upload(media_data, self)
 
     def _update_active(self, media_data):
         for media, data in media_data.items():
