@@ -114,6 +114,8 @@ class MediaItem(remi.gui.VBox):
     _filename: str
     _active_cycle: int
     _last_percentage: int
+    _marked_for_delete: bool
+
     _name: remi.gui.Label
     _action: remi.gui.Label
     _progress: remi.gui.Label
@@ -126,16 +128,34 @@ class MediaItem(remi.gui.VBox):
         self._filename = filename
         self._active_cycle = 0
         self._last_percentage = 0
+        self._marked_for_delete = False
 
         self._name = remi.gui.Label(filename, width="100%", style=_STYLE["title"])
         self._action = remi.gui.Label("", width="100%", style=_STYLE["subtitle"])
+
+        progress_container = remi.gui.HBox(width="100%", style={"background": "none"})
+
+        progress_info = remi.gui.VBox(width="85%", style={"background": "none"})
         self._progress = remi.gui.Label("", width="100%", style=_STYLE["subtitle"])
         self._bar = remi.gui.Progress(width="100%")
+        progress_info.append(self._progress)
+        progress_info.append(self._bar)
+
+        delete_button = remi.gui.Button("X", width="15%", height=30, style=_STYLE["button"])
+        delete_button.css_background_color = "#d11141"
+        delete_button.css_font_size = "20"
+        delete_button.onclick.do(self._delete_media)
+
+        progress_container.append(progress_info)
+        progress_container.append(delete_button)
 
         self.append(self._name)
         self.append(self._action)
-        self.append(self._progress)
-        self.append(self._bar)
+        self.append(progress_container)
+
+    def _delete_media(self, button: remi.gui.Button):
+        self.css_background_color = "#d11141"
+        self._marked_for_delete = True
 
     def set_media_size(self, size: int):
         self._size = self.Size(size, format_bytes(size))
@@ -152,6 +172,9 @@ class MediaItem(remi.gui.VBox):
 
     def set_media_action(self, action: str):
         self._action.set_text(action)
+
+    def is_marked_for_delete(self):
+        return self._marked_for_delete
 
     def update_active(self, active: bool):
         self._active_cycle = self._active_cycle + 1 if active else 0
@@ -202,7 +225,8 @@ class _ItemList(Generic[ItemType], remi.gui.VBox):
 
     def _single(self, key: str, func: str, *args, **kwargs):
         if key in self._list:
-            getattr(self._list[key], func)(*args, **kwargs)
+            return getattr(self._list[key], func)(*args, **kwargs)
+        return None
 
     def update_items(self, data):
         self._rebuild(data)
@@ -298,6 +322,9 @@ class MediaList(_ItemList[MediaItem]):
 
     def set_media_action(self, filename: str, action: str):
         self._single(filename, "set_media_action", action)
+
+    def is_media_marked_for_delete(self, filename: str):
+        return self._single(filename, "is_marked_for_delete")
 
 class RemotesList(_ItemList[RemoteItem]):
     def _build(self, configs: List[Dict]):

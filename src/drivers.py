@@ -138,7 +138,10 @@ class DriverSMB(DriverBase):
                     dst.write(chunk)
                     hash_src.update(chunk)
                     copied_bytes += len(chunk)
+
                     listener.set_media_progress(filename, copied_bytes)
+                    if listener.is_media_marked_for_delete(filename):
+                        return True
 
         listener.set_media_action(filename, f"Verifying checksum...")
 
@@ -147,6 +150,9 @@ class DriverSMB(DriverBase):
             while chunk := dst.read(self._chunk_size):
                 hash_dst.update(chunk)
                 verified_bytes += len(chunk)
+
                 listener.set_media_progress(filename, verified_bytes)
+                if listener.is_media_marked_for_delete(filename):
+                    return True
 
         return hash_src.hexdigest() == hash_dst.hexdigest()
