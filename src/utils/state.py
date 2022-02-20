@@ -15,12 +15,14 @@ class OperationBase():
 class Options():
     _file: Path
     _remotes: List[Dict]
+    _upload_automatically: bool
 
     _FILE = "psberry_options.pickle"
 
     def __init__(self, root: str) -> None:
         self._file = Path(root) / self._FILE
         self._remotes = []
+        self._upload_automatically = True
 
         if not Path(self._file).is_file():
             return
@@ -28,10 +30,14 @@ class Options():
         with open(self._file, "rb") as f:
             data = pickle.load(f)
 
-        self._remotes = data[0]
+        if len(data) > 0:
+            self._remotes = data[0]
+
+            if len(data) > 1:
+                self._upload_automatically = data[1]
 
     def _dump(self):
-        data = [self._remotes]
+        data = [self._remotes, self._upload_automatically]
         with open(self._file, "wb") as f:
             pickle.dump(data, f)
 
@@ -42,6 +48,15 @@ class Options():
     @remotes.setter
     def remotes(self, value: List[Dict]):
         self._remotes = value
+        self._dump()
+
+    @property
+    def upload_automatically(self) -> bool:
+        return self._upload_automatically
+
+    @upload_automatically.setter
+    def upload_automatically(self, value: bool):
+        self._upload_automatically = value
         self._dump()
 
 class State():

@@ -16,6 +16,7 @@ class PSBerry(remi.App):
     _slot_list: gui.SlotList
     _slot_buttons: gui.SlotButtonsPanel
     _media_list: gui.MediaList
+    _media_buttons: gui.MediaButtonsPanel
 
     _CONTAINER_STYLE = {"margin": "0px auto", "max-width": "400px"}
 
@@ -60,9 +61,8 @@ class PSBerry(remi.App):
         self._media_list = gui.MediaList(self._on_media_upload)
         media_uploader.append(self._media_list)
 
-        configure_remotes = remi.gui.Button("Configure Remotes", width="60%", height=30, margin="5px 20%")
-        configure_remotes.onclick.do(self._on_remotes_edit)
-        media_uploader.append(configure_remotes)
+        self._media_buttons = gui.MediaButtonsPanel(self._on_media_upload, self._on_remotes_edit, self._save_upload_automation, self._state.options.upload_automatically)
+        media_uploader.append(self._media_buttons)
 
         return "Media Uploader", media_uploader
 
@@ -96,7 +96,25 @@ class PSBerry(remi.App):
     def _on_slot_create(self, clone_active: bool):
         self._state.queue_operation(CreateSlot(clone_active=clone_active))
 
-    def _on_media_upload(self, media_data, listener):
+    def _on_media_upload(self, media_data=None, listener=None):
+        if media_data is None or listener is None:
+            # called manually with the "Upload All" button
+
+            media = self._state.read("media")
+            if media is None or self._media_list is None:
+                # TODO: log "nothing to upload"
+                return
+
+            media_data, listener = media, self._media_list
+
+        else:
+            # called automatically as a file fully arrives
+
+            self._state.write("media", media_data)
+
+            if not self._state.options.upload_automatically:
+                return
+
         drivers = self._state.read("drivers")
         if not len(drivers):
             return
@@ -106,7 +124,7 @@ class PSBerry(remi.App):
         else:
             self._state.cancel_operation(TransferFiles)
 
-    def _on_remotes_edit(self, button: remi.gui.Button):
+    def _on_remotes_edit(self, button: remi.gui.Button=None):
         config = [d.config for d in self._state.read("drivers")]
         dialog = gui.ConfigureRemotesDialog(config, DriverBase.empty_driver, style=self._CONTAINER_STYLE)
         dialog.confirm_dialog.do(self._save_remotes_configuration)
@@ -115,6 +133,9 @@ class PSBerry(remi.App):
     def _save_remotes_configuration(self, dialog: gui.ConfigureRemotesDialog):
         self._state.options.remotes = dialog.get_configs()
         self._state.write("drivers", DriverBase.from_configs(dialog.get_configs()))
+
+    def _save_upload_automation(self, check: bool):
+        self._state.options.upload_automatically = check
 
 def get_args():
     parser = argparse.ArgumentParser(description="Start PSBerry.")
